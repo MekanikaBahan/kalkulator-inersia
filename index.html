@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalkulator Penampang & Lingkaran Mohr</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            body { background-color: #ffffff !important; padding: 0 !important; }
+            .no-print { display: none !important; }
+            .print-container { box-shadow: none !important; max-width: 100% !important; padding: 0 !important; }
+            .grid { display: block !important; }
+            .section-box { page-break-inside: avoid; margin-bottom: 20px !important; border: 1px solid #cbd5e1 !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-md p-6 print-container">
+        <!-- Header -->
+        <header class="border-b pb-4 mb-6 flex justify-between items-start">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Kalkulator Penampang & Visualisasi Lingkaran Mohr</h1>
+                <p class="text-sm text-slate-500">Analisis geometri, Inersia Produk ($I_{xy}$), Sumbu Utama ($\theta_p$), & Grafik Lingkaran Mohr.</p>
+            </div>
+            <button onclick="window.print()" class="no-print bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg transition flex items-center gap-2 text-sm shadow">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Cetak / Ekspor PDF
+            </button>
+        </header>
+
+        <!-- Main Layout (4 Grid Layout) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <!-- Kolom 1: Input Form -->
+            <section class="space-y-4 section-box p-4 rounded-lg bg-slate-50 border border-slate-200">
+                <h2 class="text-base font-bold border-b pb-2 text-slate-700">1. Parameter Input</h2>
+                <div>
+                    <label class="block font-semibold mb-1 text-xs">Pilih Bentuk Penampang:</label>
+                    <select id="shapeSelect" onchange="changeShape()" class="w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="rectangle">Persegi Panjang (Rectangular)</option>
+                        <option value="circle">Lingkaran (Circular)</option>
+                        <option value="ishape">Profil I (I-Beam / WF)</option>
+                        <option value="lshape" selected>Profil Siku / L-Shape (Asimetris)</option>
+                        <option value="cshape">Profil Kanal / C-Shape (Kanal)</option>
+                    </select>
+                </div>
+
+                <div id="inputFields" class="space-y-2 text-xs">
+                    <!-- Diisi oleh JS -->
+                </div>
+
+                <button onclick="calculate()" class="no-print w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition text-sm">
+                    Hitung & Visualisasikan
+                </button>
+            </section>
+
+            <!-- Kolom 2: Sketsa Penampang -->
+            <section class="bg-slate-50 p-4 rounded-lg border border-slate-200 flex flex-col items-center justify-between section-box">
+                <div class="w-full">
+                    <h2 class="text-base font-bold mb-2 border-b pb-2 text-slate-700">2. Sketsa Penampang</h2>
+                    <div class="flex justify-center items-center bg-white border rounded-lg p-2">
+                        <canvas id="sectionCanvas" width="220" height="220" class="border border-slate-100"></canvas>
+                    </div>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-1 text-center">*Titik merah menunjukkan Pusat Berat ($x_c, y_c$).</p>
+            </section>
+
+            <!-- Kolom 3: Gambar Lingkaran Mohr -->
+            <section class="bg-slate-50 p-4 rounded-lg border border-slate-200 flex flex-col items-center justify-between section-box">
+                <div class="w-full">
+                    <h2 class="text-base font-bold mb-2 border-b pb-2 text-slate-700">3. Grafik Lingkaran Mohr</h2>
+                    <div class="flex justify-center items-center bg-white border rounded-lg p-2">
+                        <canvas id="mohrCanvas" width="220" height="220" class="border border-slate-100"></canvas>
+                    </div>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-1 text-center">*Sumbu-X: $I$, Sumbu-Y: $I_{xy}$, Garis Merah: $2\theta_p$.</p>
+            </section>
+
+            <!-- Kolom 4: Hasil Perhitungan -->
+            <section class="bg-slate-50 p-4 rounded-lg border border-slate-200 flex flex-col justify-between section-box">
+                <div>
+                    <h2 class="text-base font-bold mb-2 border-b pb-2 text-slate-700">4. Hasil Properti Lengkap</h2>
+                    <div id="results" class="space-y-1 text-xs">
+                        <!-- Diisi oleh JS -->
+                    </div>
+                </div>
+
+                <div class="mt-2 pt-2 border-t text-[10px] text-slate-500">
+                    <p><strong>Formulasi Utama:</strong></p>
+                    <ul class="list-disc pl-3 mt-0.5 space-y-0.5">
+                        <li>$I_{xy} = \sum (I_{x'y'} + A_i \cdot dx_i \cdot dy_i)$</li>
+                        <li>$\tan(2\theta_p) = \frac{-2I_{xy}}{I_x - I_y}$</li>
+                        <li>$I_{max,min} = \frac{I_x + I_y}{2} \pm \sqrt{\left(\frac{I_x - I_y}{2}\right)^2 + I_{xy}^2}$</li>
+                    </ul>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- Script Matematika, Steiner's Theorem, Visualisasi Penampang, & Lingkaran Mohr -->
+    <script>
+        const shapes = {
+            rectangle: [
+                { id: 'b', label: 'Lebar, b (mm)', default: 150 },
+                { id: 'h', label: 'Tinggi, h (mm)', default: 300 }
+            ],
+            circle: [
+                { id: 'd', label: 'Diameter, d (mm)', default: 200 }
+            ],
+            ishape: [
+                { id: 'bf', label: 'Lebar Sayap, bf (mm)', default: 150 },
+                { id: 'tf', label: 'Tebal Sayap, tf (mm)', default: 10 },
+                { id: 'hw', label: 'Tinggi Badan, hw (mm)', default: 280 },
+                { id: 'tw', label: 'Tebal Badan, tw (mm)', default: 8 }
+            ],
+            lshape: [
+                { id: 'b', label: 'Lebar Kaki Horisontal, b (mm)', default: 100 },
+                { id: 'h', label: 'Tinggi Kaki Vertikal, h (mm)', default: 150 },
+                { id: 't', label: 'Tebal Penampang, t (mm)', default: 10 }
+            ],
+            cshape: [
+                { id: 'b', label: 'Lebar Sayap, b (mm)', default: 75 },
+                { id: 'h', label: 'Tinggi Total, h (mm)', default: 200 },
+                { id: 'tf', label: 'Tebal Sayap, tf (mm)', default: 10 },
+                { id: 'tw', label: 'Tebal Badan, tw (mm)', default: 8 }
+            ]
+        };
+
+        function changeShape() {
+            const shape = document.getElementById('shapeSelect').value;
+            const container = document.getElementById('inputFields');
+            container.innerHTML = '';
+
+            shapes[shape].forEach(field => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <label class="block font-medium text-slate-600 mb-0.5">${field.label}</label>
+                    <input type="number" id="${field.id}" value="${field.default}" step="any" class="w-full p-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 outline-none">
+                `;
+                container.appendChild(div);
+            });
+
+            calculate();
+        }
+
+        function calculate() {
+            const shape = document.getElementById('shapeSelect').value;
+            let A = 0, Ix = 0, Iy = 0, Ixy = 0, xc = 0, yc = 0;
+
+            if (shape === 'rectangle') {
+                const b = parseFloat(document.getElementById('b').value) || 0;
+                const h = parseFloat(document.getElementById('h').value) || 0;
+                A = b * h; xc = b / 2; yc = h / 2;
+                Ix = (b * Math.pow(h, 3)) / 12; Iy = (h * Math.pow(b, 3)) / 12; Ixy = 0;
+                drawRectangle(b, h);
+
+            } else if (shape === 'circle') {
+                const d = parseFloat(document.getElementById('d').value) || 0;
+                const r = d / 2;
+                A = Math.PI * Math.pow(r, 2); xc = r; yc = r;
+                Ix = (Math.PI * Math.pow(d, 4)) / 64; Iy = Ix; Ixy = 0;
+                drawCircle(d);
+
+            } else if (shape === 'ishape') {
+                const bf = parseFloat(document.getElementById('bf').value) || 0;
+                const tf = parseFloat(document.getElementById('tf').value) || 0;
+                const hw = parseFloat(document.getElementById('hw').value) || 0;
+                const tw = parseFloat(document.getElementById('tw').value) || 0;
+                const hTotal = hw + (2 * tf);
+                const A_flange = bf * tf; const A_web = hw * tw;
+                A = (2 * A_flange) + A_web; xc = bf / 2; yc = hTotal / 2;
+                const Ix_web = (tw * Math.pow(hw, 3)) / 12;
+                const Ix_flange_own = (bf * Math.pow(tf, 3)) / 12;
+                const d_flange = (hw / 2) + (tf / 2);
+                Ix = Ix_web + 2 * (Ix_flange_own + A_flange * Math.pow(d_flange, 2));
+                Iy = ((hw * Math.pow(tw, 3)) / 12) + 2 * ((tf * Math.pow(bf, 3)) / 12);
+                Ixy = 0;
+                drawIShape(bf, tf, hw, tw);
+
+            } else if (shape === 'lshape') {
+                const b = parseFloat(document.getElementById('b').value) || 0;
+                const h = parseFloat(document.getElementById('h').value) || 0;
+                const t = parseFloat(document.getElementById('t').value) || 0;
+
+                const A1 = b * t; const x1 = b / 2; const y1 = t / 2;
+                const A2 = (h - t) * t; const x2 = t / 2; const y2 = t + (h - t) / 2;
+
+                A = A1 + A2;
+                xc = (A1 * x1 + A2 * x2) / A;
+                yc = (A1 * y1 + A2 * y2) / A;
+
+                // Teorema Sumbu Sejajar (Steiner)
+                Ix = ((b * Math.pow(t, 3)) / 12 + A1 * Math.pow(y1 - yc, 2)) + (((t * Math.pow(h - t, 3)) / 12) + A2 * Math.pow(y2 - yc, 2));
+                Iy = ((t * Math.pow(b, 3)) / 12 + A1 * Math.pow(x1 - xc, 2)) + ((((h - t) * Math.pow(t, 3)) / 12) + A2 * Math.pow(x2 - xc, 2));
+                
+                // Momen Inersia Produk (Ixy)
+                Ixy = (0 + A1 * (x1 - xc) * (y1 - yc)) + (0 + A2 * (x2 - xc) * (y2 - yc));
+
+                drawLShape(b, h, t, xc, yc);
+
+            } else if (shape === 'cshape') {
+                const b = parseFloat(document.getElementById('b').value) || 0;
+                const h = parseFloat(document.getElementById('h').value) || 0;
+                const tf = parseFloat(document.getElementById('tf').value) || 0;
+                const tw = parseFloat(document.getElementById('tw').value) || 0;
+                const hw = h - 2 * tf;
+                const A_flange = b * tf; const A_web = hw * tw;
+
+                A = 2 * A_flange + A_web;
+                const x_flange = b / 2; const x_web = tw / 2;
+                xc = (2 * A_flange * x_flange + A_web * x_web) / A; yc = h / 2;
+
+                const Ix_web = (tw * Math.pow(hw, 3)) / 12;
+                const Ix_flange_own = (b * Math.pow(tf, 3)) / 12;
+                const dy_flange = (hw / 2) + (tf / 2);
+                Ix = Ix_web + 2 * (Ix_flange_own + A_flange * Math.pow(dy_flange, 2));
+
+                Iy = ((hw * Math.pow(tw, 3)) / 12 + A_web * Math.pow(x_web - xc, 2)) + 2 * ((tf * Math.pow(b, 3)) / 12 + A_flange * Math.pow(x_flange - xc, 2));
+                Ixy = 0;
+
+                drawCShape(b, h, tf, tw, xc, yc);
+            }
+
+            // --- PERHITUNGAN LINGKARAN MOHR & INERSIA UTAMA ---
+            const I_avg = (Ix + Iy) / 2;
+            const R = Math.sqrt(Math.pow((Ix - Iy) / 2, 2) + Math.pow(Ixy, 2));
+            const I_max = I_avg + R;
+            const I_min = I_avg - R;
+
+            let theta_p = 0;
+            if (Ix !== Iy) {
+                theta_p = (Math.atan2(-2 * Ixy, Ix - Iy) * 180 / Math.PI) / 2;
+            } else if (Ixy !== 0) {
+                theta_p = 45;
+            }
+
+            const Sx = Ix / yc; const Sy = Iy / xc;
+            const rx = Math.sqrt(Ix / A); const ry = Math.sqrt(Iy / A);
+
+            // Visualisasikan Lingkaran Mohr di Canvas
+            drawMohrCircle(Ix, Iy, Ixy, I_avg, R, theta_p);
+
+            // Render Hasil Teks
+            document.getElementById('results').innerHTML = `
+                <div class="grid grid-cols-2 gap-x-1 border-b pb-1">
+                    <div><span class="text-slate-500">Luas ($A$):</span><br><strong class="text-blue-600">${A.toFixed(1)}</strong> mm²</div>
+                    <div><span class="text-slate-500">Pusat ($x_c, y_c$):</span><br><strong class="text-blue-600">${xc.toFixed(1)}, ${yc.toFixed(1)}</strong> mm</div>
+                </div>
+                <div class="grid grid-cols-2 gap-x-1 border-b pb-1">
+                    <div><span class="text-slate-500">Inersia ($I_x$):</span><br><strong>${Ix.toExponential(2)}</strong> mm⁴</div>
+                    <div><span class="text-slate-500">Inersia ($I_y$):</span><br><strong>${Iy.toExponential(2)}</strong> mm⁴</div>
+                </div>
+                <div class="grid grid-cols-2 gap-x-1 border-b pb-1 bg-amber-50 p-1 rounded">
+                    <div><span class="text-slate-600 font-medium">Inersia Produk ($I_{xy}$):</span><br><strong class="text-amber-700">${Ixy.toExponential(2)}</strong> mm⁴</div>
+                    <div><span class="text-slate-600 font-medium">Sudut Utama ($\theta_p$):</span><br><strong class="text-amber-700">${theta_p.toFixed(2)}°</strong></div>
+                </div>
+                <div class="grid grid-cols-2 gap-x-1 border-b pb-1 bg-emerald-50 p-1 rounded">
+                    <div><span class="text-slate-600 font-medium">Inersia Max ($I_{max}$):</span><br><strong class="text-emerald-700">${I_max.toExponential(2)}</strong> mm⁴</div>
+                    <div><span class="text-slate-600 font-medium">Inersia Min ($I_{min}$):</span><br><strong class="text-emerald-700">${I_min.toExponential(2)}</strong> mm⁴</div>
+                </div>
+                <div class="grid grid-cols-2 gap-x-1">
+                    <div><span class="text-slate-500">Jari-jari ($r_x, r_y$):</span><br><strong>${rx.toFixed(1)}, ${ry.toFixed(1)}</strong> mm</div>
+                    <div><span class="text-slate-500">Modulus ($S_x, S_y$):</span><br><strong>${Sx.toFixed(0)}, ${Sy.toFixed(0)}</strong> mm³</div>
+                </div>
+            `;
+        }
+
+        // --- FUNGSI MENGGAMBAR LINGKARAN MOHR ---
+        function drawMohrCircle(Ix, Iy, Ixy, I_avg, R, theta_p) {
+            const canvas = document.getElementById('mohrCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const padding = 35;
+            const w = canvas.width;
+            const h = canvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+
+            // Skala Otomatis Berdasarkan Radius & Momen Maksimum
+            const maxVal = Math.max(I_avg + R, Math.abs(Ixy)) * 1.2 || 1;
+            const scale = (w / 2 - padding) / maxVal;
+
+            // Gambar Sumbu Koordinat (Horizontal: I, Vertikal: Ixy)
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(10, cy); ctx.lineTo(w - 10, cy); // Sumbu I
+            ctx.moveTo(cx, 10); ctx.lineTo(cx, h - 10); // Sumbu Ixy
+            ctx.stroke();
+
+            // Titik Pusat Lingkaran Mohr (I_avg, 0)
+            const mohrCx = cx + (I_avg - I_avg) * scale; // Di tengah tampilan sumbu lokal
+            const mohrCy = cy;
+            const mohrR = Math.max(R * scale, 5); // Minimum radius agar terlihat
+
+            // Lingkaran Mohr
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(mohrCx, mohrCy, mohrR, 0, 2 * Math.PI);
+            ctx.stroke();
+
+            // Plot Titik X (Ix, Ixy) dan Y (Iy, -Ixy)
+            const ptX = { x: mohrCx + ((Ix - I_avg) * scale), y: cy - (Ixy * scale) };
+            const ptY = { x: mohrCx + ((Iy - I_avg) * scale), y: cy + (Ixy * scale) };
+
+            // Garis Diametral (Menghubungkan X dan Y melalui Pusat)
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(ptX.x, ptX.y);
+            ctx.lineTo(ptY.x, ptY.y);
+            ctx.stroke();
+
+            // Marker Titik X & Y
+            ctx.fillStyle = '#1e3a8a';
+            ctx.beginPath(); ctx.arc(ptX.x, ptX.y, 4, 0, 2 * Math.PI); ctx.fill();
+            ctx.beginPath(); ctx.arc(ptY.x, ptY.y, 4, 0, 2 * Math.PI); ctx.fill();
+
+            // Teks Label Sumbu Lingkaran Mohr
+            ctx.fillStyle = '#64748b';
+            ctx.font = '9px sans-serif';
+            ctx.fillText('I', w - 15, cy - 5);
+            ctx.fillText('Ixy', cx + 5, 15);
+            ctx.fillText('X(Ix,Ixy)', ptX.x + 4, ptX.y - 4);
+        }
+
+        // --- FUNGSI MENGGAMBAR PENAMPANG ---
+        function clearCanvas(id) {
+            const canvas = document.getElementById(id);
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return { canvas, ctx };
+        }
+
+        function drawCentroidMarker(ctx, x, y) {
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath(); ctx.arc(x, y, 4, 0, 2 * Math.PI); ctx.fill();
+        }
+
+        function drawRectangle(b, h) {
+            const { canvas, ctx } = clearCanvas('sectionCanvas');
+            const scale = Math.min((canvas.width - 40) / b, (canvas.height - 40) / h);
+            const w = b * scale, ht = h * scale;
+            const x0 = (canvas.width - w) / 2, y0 = (canvas.height - ht) / 2;
+
+            ctx.fillStyle = '#93c5fd'; ctx.strokeStyle = '#1d4ed8'; ctx.lineWidth = 2;
+            ctx.fillRect(x0, y0, w, ht); ctx.strokeRect(x0, y0, w, ht);
+            drawCentroidMarker(ctx, x0 + w / 2, y0 + ht / 2);
+        }
+
+        function drawCircle(d) {
+            const { canvas, ctx } = clearCanvas('sectionCanvas');
+            const scale = (canvas.width - 40) / d;
+            const radius = (d / 2) * scale;
+            const cx = canvas.width / 2, cy = canvas.height / 2;
+
+            ctx.fillStyle = '#93c5fd'; ctx.strokeStyle = '#1d4ed8'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(cx, cy, radius, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+            drawCentroidMarker(ctx, cx, cy);
+        }
+
+        function drawIShape(bf, tf, hw, tw) {
+            const { canvas, ctx } = clearCanvas('sectionCanvas');
+            const hTotal = hw + 2 * tf;
+            const scale = Math.min((canvas.width - 40) / bf, (canvas.height - 40) / hTotal);
+            const wF = bf * scale, hF = tf * scale, hW = hw * scale, wW = tw * scale;
+            const cx = canvas.width / 2, cy = canvas.height / 2;
+
+            ctx.fillStyle = '#93c5fd'; ctx.strokeStyle = '#1d4ed8'; ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.rect(cx - wF / 2, cy - (hW / 2 + hF), wF, hF);
+            ctx.rect(cx - wW / 2, cy - hW / 2, wW, hW);
+            ctx.rect(cx - wF / 2, cy + hW / 2, wF, hF);
+            ctx.fill(); ctx.stroke();
+            drawCentroidMarker(ctx, cx, cy);
+        }
+
+        function drawLShape(b, h, t, xc, yc) {
+            const { canvas, ctx } = clearCanvas('sectionCanvas');
+            const scale = Math.min((canvas.width - 40) / b, (canvas.height - 40) / h);
+            const x0 = 20, y0 = canvas.height - 20;
+
+            ctx.fillStyle = '#93c5fd'; ctx.strokeStyle = '#1d4ed8'; ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x0 + b * scale, y0);
+            ctx.lineTo(x0 + b * scale, y0 - t * scale);
+            ctx.lineTo(x0 + t * scale, y0 - t * scale);
+            ctx.lineTo(x0 + t * scale, y0 - h * scale);
+            ctx.lineTo(x0, y0 - h * scale);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            drawCentroidMarker(ctx, x0 + xc * scale, y0 - yc * scale);
+        }
+
+        function drawCShape(b, h, tf, tw, xc, yc) {
+            const { canvas, ctx } = clearCanvas('sectionCanvas');
+            const scale = Math.min((canvas.width - 40) / b, (canvas.height - 40) / h);
+            const x0 = 20, y0 = canvas.height - 20;
+
+            ctx.fillStyle = '#93c5fd'; ctx.strokeStyle = '#1d4ed8'; ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x0 + b * scale, y0);
+            ctx.lineTo(x0 + b * scale, y0 - tf * scale);
+            ctx.lineTo(x0 + tw * scale, y0 - tf * scale);
+            ctx.lineTo(x0 + tw * scale, y0 - (h - tf) * scale);
+            ctx.lineTo(x0 + b * scale, y0 - (h - tf) * scale);
+            ctx.lineTo(x0 + b * scale, y0 - h * scale);
+            ctx.lineTo(x0, y0 - h * scale);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            drawCentroidMarker(ctx, x0 + xc * scale, y0 - yc * scale);
+        }
+
+        changeShape();
+    </script>
+</body>
+</html>
