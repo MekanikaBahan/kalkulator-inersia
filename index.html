@@ -42,8 +42,8 @@
                 <div>
                     <label class="block font-semibold mb-1 text-xs">Pilih Bentuk Penampang:</label>
                     <select id="shapeSelect" onchange="changeShape()" class="w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                        <option value="right_triangle" selected>Segitiga Siku-Siku / 90° (Right Triangle)</option>
-                        <option value="eq_triangle">Segitiga Sama Sisi (Equilateral Triangle)</option>
+                        <option value="gen_triangle" selected>Segitiga Sama Kaki / Variabel (General Triangle)</option>
+                        <option value="right_triangle">Segitiga Siku-Siku / 90° (Right Triangle)</option>
                         <option value="rectangle">Persegi Panjang (Rectangular)</option>
                         <option value="circle">Lingkaran Pejal (Solid Circular)</option>
                         <option value="hollow_circle">Pipa / Lingkaran Berongga (Hollow Circular)</option>
@@ -109,12 +109,13 @@
     <!-- Script Matematika, Steiner's Theorem, Visualisasi Penampang, & Lingkaran Mohr -->
     <script>
         const shapes = {
+            gen_triangle: [
+                { id: 'b', label: 'Lebar Alas, b (mm)', default: 150 },
+                { id: 'h', label: 'Tinggi, h (mm)', default: 200 }
+            ],
             right_triangle: [
                 { id: 'b', label: 'Lebar Alas, b (mm)', default: 120 },
                 { id: 'h', label: 'Tinggi, h (mm)', default: 180 }
-            ],
-            eq_triangle: [
-                { id: 'a', label: 'Panjang Sisi, a (mm)', default: 150 }
             ],
             rectangle: [
                 { id: 'b', label: 'Lebar, b (mm)', default: 150 },
@@ -167,7 +168,18 @@
             const shape = document.getElementById('shapeSelect').value;
             let A = 0, Ix = 0, Iy = 0, Ixy = 0, xc = 0, yc = 0;
 
-            if (shape === 'right_triangle') {
+            if (shape === 'gen_triangle') {
+                const b = parseFloat(document.getElementById('b').value) || 0;
+                const h = parseFloat(document.getElementById('h').value) || 0;
+                A = (b * h) / 2;
+                xc = b / 2;
+                yc = h / 3;
+                Ix = (b * Math.pow(h, 3)) / 36;
+                Iy = (h * Math.pow(b, 3)) / 48;
+                Ixy = 0; // Simetris terhadap sumbu vertikal centroid
+                drawGenTriangle(b, h, xc, yc);
+
+            } else if (shape === 'right_triangle') {
                 const b = parseFloat(document.getElementById('b').value) || 0;
                 const h = parseFloat(document.getElementById('h').value) || 0;
                 A = (b * h) / 2;
@@ -177,17 +189,6 @@
                 Iy = (h * Math.pow(b, 3)) / 36;
                 Ixy = -(Math.pow(b, 2) * Math.pow(h, 2)) / 72;
                 drawRightTriangle(b, h, xc, yc);
-
-            } else if (shape === 'eq_triangle') {
-                const a = parseFloat(document.getElementById('a').value) || 0;
-                const h = (Math.sqrt(3) / 2) * a;
-                A = (a * h) / 2;
-                xc = a / 2;
-                yc = h / 3;
-                Ix = (a * Math.pow(h, 3)) / 36;
-                Iy = (h * Math.pow(a, 3)) / 48;
-                Ixy = 0;
-                drawEqTriangle(a, h, xc, yc);
 
             } else if (shape === 'rectangle') {
                 const b = parseFloat(document.getElementById('b').value) || 0;
@@ -381,6 +382,23 @@
             ctx.beginPath(); ctx.arc(x, y, 4, 0, 2 * Math.PI); ctx.fill();
         }
 
+        function drawGenTriangle(b, h, xc, yc) {
+            const { canvas, ctx } = clearCanvas('sectionCanvas');
+            const scale = Math.min((canvas.width - 40) / b, (canvas.height - 40) / h);
+            const x0 = (canvas.width - b * scale) / 2;
+            const y0 = canvas.height - (canvas.height - h * scale) / 2;
+
+            ctx.fillStyle = '#93c5fd'; ctx.strokeStyle = '#1d4ed8'; ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x0 + b * scale, y0);
+            ctx.lineTo(x0 + (b / 2) * scale, y0 - h * scale);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            drawCentroidMarker(ctx, x0 + xc * scale, y0 - yc * scale);
+        }
+
         function drawRightTriangle(b, h, xc, yc) {
             const { canvas, ctx } = clearCanvas('sectionCanvas');
             const scale = Math.min((canvas.width - 40) / b, (canvas.height - 40) / h);
@@ -392,23 +410,6 @@
             ctx.moveTo(x0, y0);
             ctx.lineTo(x0 + b * scale, y0);
             ctx.lineTo(x0, y0 - h * scale);
-            ctx.closePath();
-            ctx.fill(); ctx.stroke();
-
-            drawCentroidMarker(ctx, x0 + xc * scale, y0 - yc * scale);
-        }
-
-        function drawEqTriangle(a, h, xc, yc) {
-            const { canvas, ctx } = clearCanvas('sectionCanvas');
-            const scale = Math.min((canvas.width - 40) / a, (canvas.height - 40) / h);
-            const x0 = (canvas.width - a * scale) / 2;
-            const y0 = canvas.height - (canvas.height - h * scale) / 2;
-
-            ctx.fillStyle = '#93c5fd'; ctx.strokeStyle = '#1d4ed8'; ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(x0, y0);
-            ctx.lineTo(x0 + a * scale, y0);
-            ctx.lineTo(x0 + (a / 2) * scale, y0 - h * scale);
             ctx.closePath();
             ctx.fill(); ctx.stroke();
 
