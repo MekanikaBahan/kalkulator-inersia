@@ -43,7 +43,8 @@
                     <label class="block font-semibold mb-1 text-xs">Pilih Bentuk Penampang:</label>
                     <select id="shapeSelect" onchange="changeShape()" class="w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                         <option value="rectangle">Persegi Panjang (Rectangular)</option>
-                        <option value="circle">Lingkaran (Circular)</option>
+                        <option value="circle">Lingkaran Pejal (Solid Circular)</option>
+                        <option value="hollow_circle">Pipa / Lingkaran Berrongga (Hollow Circular)</option>
                         <option value="ishape">Profil I (I-Beam / WF)</option>
                         <option value="lshape" selected>Profil Siku / L-Shape (Asimetris)</option>
                         <option value="cshape">Profil Kanal / C-Shape (Kanal)</option>
@@ -113,6 +114,10 @@
             circle: [
                 { id: 'd', label: 'Diameter, d (mm)', default: 200 }
             ],
+            hollow_circle: [
+                { id: 'do', label: 'Diameter Luar, Do (mm)', default: 200 },
+                { id: 'di', label: 'Diameter Dalam, Di (mm)', default: 160 }
+            ],
             ishape: [
                 { id: 'bf', label: 'Lebar Sayap, bf (mm)', default: 150 },
                 { id: 'tf', label: 'Tebal Sayap, tf (mm)', default: 10 },
@@ -166,6 +171,23 @@
                 A = Math.PI * Math.pow(r, 2); xc = r; yc = r;
                 Ix = (Math.PI * Math.pow(d, 4)) / 64; Iy = Ix; Ixy = 0;
                 drawCircle(d);
+
+            } else if (shape === 'hollow_circle') {
+                const doVal = parseFloat(document.getElementById('do').value) || 0;
+                let diVal = parseFloat(document.getElementById('di').value) || 0;
+                
+                // Validasi sederhana agar diameter dalam tidak melampaui diameter luar
+                if (diVal >= doVal) diVal = doVal - 1;
+
+                A = (Math.PI / 4) * (Math.pow(doVal, 2) - Math.pow(diVal, 2));
+                xc = doVal / 2; 
+                yc = doVal / 2;
+                
+                Ix = (Math.PI / 64) * (Math.pow(doVal, 4) - Math.pow(diVal, 4));
+                Iy = Ix;
+                Ixy = 0;
+
+                drawHollowCircle(doVal, diVal);
 
             } else if (shape === 'ishape') {
                 const bf = parseFloat(document.getElementById('bf').value) || 0;
@@ -283,35 +305,29 @@
             const cx = w / 2;
             const cy = h / 2;
 
-            // Skala Otomatis Berdasarkan Radius & Momen Maksimum
             const maxVal = Math.max(I_avg + R, Math.abs(Ixy)) * 1.2 || 1;
             const scale = (w / 2 - padding) / maxVal;
 
-            // Gambar Sumbu Koordinat (Horizontal: I, Vertikal: Ixy)
             ctx.strokeStyle = '#cbd5e1';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(10, cy); ctx.lineTo(w - 10, cy); // Sumbu I
-            ctx.moveTo(cx, 10); ctx.lineTo(cx, h - 10); // Sumbu Ixy
+            ctx.moveTo(10, cy); ctx.lineTo(w - 10, cy);
+            ctx.moveTo(cx, 10); ctx.lineTo(cx, h - 10);
             ctx.stroke();
 
-            // Titik Pusat Lingkaran Mohr (I_avg, 0)
-            const mohrCx = cx + (I_avg - I_avg) * scale; // Di tengah tampilan sumbu lokal
+            const mohrCx = cx + (I_avg - I_avg) * scale;
             const mohrCy = cy;
-            const mohrR = Math.max(R * scale, 5); // Minimum radius agar terlihat
+            const mohrR = Math.max(R * scale, 5);
 
-            // Lingkaran Mohr
             ctx.strokeStyle = '#2563eb';
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(mohrCx, mohrCy, mohrR, 0, 2 * Math.PI);
             ctx.stroke();
 
-            // Plot Titik X (Ix, Ixy) dan Y (Iy, -Ixy)
             const ptX = { x: mohrCx + ((Ix - I_avg) * scale), y: cy - (Ixy * scale) };
             const ptY = { x: mohrCx + ((Iy - I_avg) * scale), y: cy + (Ixy * scale) };
 
-            // Garis Diametral (Menghubungkan X dan Y melalui Pusat)
             ctx.strokeStyle = '#ef4444';
             ctx.lineWidth = 1.5;
             ctx.beginPath();
@@ -319,12 +335,10 @@
             ctx.lineTo(ptY.x, ptY.y);
             ctx.stroke();
 
-            // Marker Titik X & Y
             ctx.fillStyle = '#1e3a8a';
             ctx.beginPath(); ctx.arc(ptX.x, ptX.y, 4, 0, 2 * Math.PI); ctx.fill();
             ctx.beginPath(); ctx.arc(ptY.x, ptY.y, 4, 0, 2 * Math.PI); ctx.fill();
 
-            // Teks Label Sumbu Lingkaran Mohr
             ctx.fillStyle = '#64748b';
             ctx.font = '9px sans-serif';
             ctx.fillText('I', w - 15, cy - 5);
@@ -364,6 +378,32 @@
 
             ctx.fillStyle = '#93c5fd'; ctx.strokeStyle = '#1d4ed8'; ctx.lineWidth = 2;
             ctx.beginPath(); ctx.arc(cx, cy, radius, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+            drawCentroidMarker(ctx, cx, cy);
+        }
+
+        function drawHollowCircle(doVal, diVal) {
+            const { canvas, ctx } = clearCanvas('sectionCanvas');
+            const scale = (canvas.width - 40) / doVal;
+            const rOuter = (doVal / 2) * scale;
+            const rInner = (diVal / 2) * scale;
+            const cx = canvas.width / 2, cy = canvas.height / 2;
+
+            ctx.fillStyle = '#93c5fd'; 
+            ctx.strokeStyle = '#1d4ed8'; 
+            ctx.lineWidth = 2;
+
+            // Menggambar Lingkaran Luar dengan Lubang di Tengah
+            ctx.beginPath();
+            ctx.arc(cx, cy, rOuter, 0, 2 * Math.PI, false);
+            ctx.arc(cx, cy, rInner, 0, 2 * Math.PI, true); // Path berlawanan jarum jam untuk memotong
+            ctx.fill();
+            ctx.stroke();
+
+            // Lingkaran batas dalam
+            ctx.beginPath();
+            ctx.arc(cx, cy, rInner, 0, 2 * Math.PI, false);
+            ctx.stroke();
+
             drawCentroidMarker(ctx, cx, cy);
         }
 
