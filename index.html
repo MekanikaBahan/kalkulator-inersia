@@ -44,7 +44,9 @@
                     <select id="shapeSelect" onchange="changeShape()" class="w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                         <option value="rectangle">Persegi Panjang (Rectangular)</option>
                         <option value="circle">Lingkaran Pejal (Solid Circular)</option>
-                        <option value="hollow_circle">Pipa / Lingkaran Berrongga (Hollow Circular)</option>
+                        <option value="hollow_circle">Pipa / Lingkaran Berongga (Hollow Circular)</option>
+                        <option value="eq_triangle">Segitiga Sama Sisi (Equilateral Triangle)</option>
+                        <option value="right_triangle">Segitiga Siku-Siku / 90° (Right Triangle)</option>
                         <option value="ishape">Profil I (I-Beam / WF)</option>
                         <option value="lshape" selected>Profil Siku / L-Shape (Asimetris)</option>
                         <option value="cshape">Profil Kanal / C-Shape (Kanal)</option>
@@ -118,6 +120,13 @@
                 { id: 'do', label: 'Diameter Luar, Do (mm)', default: 200 },
                 { id: 'di', label: 'Diameter Dalam, Di (mm)', default: 160 }
             ],
+            eq_triangle: [
+                { id: 'a', label: 'Panjang Sisi, a (mm)', default: 150 }
+            ],
+            right_triangle: [
+                { id: 'b', label: 'Lebar Alas, b (mm)', default: 120 },
+                { id: 'h', label: 'Tinggi, h (mm)', default: 180 }
+            ],
             ishape: [
                 { id: 'bf', label: 'Lebar Sayap, bf (mm)', default: 150 },
                 { id: 'tf', label: 'Tebal Sayap, tf (mm)', default: 10 },
@@ -175,19 +184,35 @@
             } else if (shape === 'hollow_circle') {
                 const doVal = parseFloat(document.getElementById('do').value) || 0;
                 let diVal = parseFloat(document.getElementById('di').value) || 0;
-                
-                // Validasi sederhana agar diameter dalam tidak melampaui diameter luar
                 if (diVal >= doVal) diVal = doVal - 1;
 
                 A = (Math.PI / 4) * (Math.pow(doVal, 2) - Math.pow(diVal, 2));
-                xc = doVal / 2; 
-                yc = doVal / 2;
-                
+                xc = doVal / 2; yc = doVal / 2;
                 Ix = (Math.PI / 64) * (Math.pow(doVal, 4) - Math.pow(diVal, 4));
-                Iy = Ix;
-                Ixy = 0;
-
+                Iy = Ix; Ixy = 0;
                 drawHollowCircle(doVal, diVal);
+
+            } else if (shape === 'eq_triangle') {
+                const a = parseFloat(document.getElementById('a').value) || 0;
+                const h = (Math.sqrt(3) / 2) * a;
+                A = (a * h) / 2;
+                xc = a / 2;
+                yc = h / 3;
+                Ix = (a * Math.pow(h, 3)) / 36;
+                Iy = (h * Math.pow(a, 3)) / 48;
+                Ixy = 0; // Simetris terhadap sumbu vertikal
+                drawEqTriangle(a, h, xc, yc);
+
+            } else if (shape === 'right_triangle') {
+                const b = parseFloat(document.getElementById('b').value) || 0;
+                const h = parseFloat(document.getElementById('h').value) || 0;
+                A = (b * h) / 2;
+                xc = b / 3;
+                yc = h / 3;
+                Ix = (b * Math.pow(h, 3)) / 36;
+                Iy = (h * Math.pow(b, 3)) / 36;
+                Ixy = -(Math.pow(b, 2) * Math.pow(h, 2)) / 72; // Rumus inersia produk segitiga siku-siku dari centroid
+                drawRightTriangle(b, h, xc, yc);
 
             } else if (shape === 'ishape') {
                 const bf = parseFloat(document.getElementById('bf').value) || 0;
@@ -217,11 +242,8 @@
                 xc = (A1 * x1 + A2 * x2) / A;
                 yc = (A1 * y1 + A2 * y2) / A;
 
-                // Teorema Sumbu Sejajar (Steiner)
                 Ix = ((b * Math.pow(t, 3)) / 12 + A1 * Math.pow(y1 - yc, 2)) + (((t * Math.pow(h - t, 3)) / 12) + A2 * Math.pow(y2 - yc, 2));
                 Iy = ((t * Math.pow(b, 3)) / 12 + A1 * Math.pow(x1 - xc, 2)) + ((((h - t) * Math.pow(t, 3)) / 12) + A2 * Math.pow(x2 - xc, 2));
-                
-                // Momen Inersia Produk (Ixy)
                 Ixy = (0 + A1 * (x1 - xc) * (y1 - yc)) + (0 + A2 * (x2 - xc) * (y2 - yc));
 
                 drawLShape(b, h, t, xc, yc);
@@ -388,23 +410,53 @@
             const rInner = (diVal / 2) * scale;
             const cx = canvas.width / 2, cy = canvas.height / 2;
 
-            ctx.fillStyle = '#93c5fd'; 
-            ctx.strokeStyle = '#1d4ed8'; 
-            ctx.lineWidth = 2;
+            ctx.fillStyle = '#93c5fd'; ctx.strokeStyle = '#1d4ed8'; ctx.lineWidth = 2;
 
-            // Menggambar Lingkaran Luar dengan Lubang di Tengah
             ctx.beginPath();
             ctx.arc(cx, cy, rOuter, 0, 2 * Math.PI, false);
-            ctx.arc(cx, cy, rInner, 0, 2 * Math.PI, true); // Path berlawanan jarum jam untuk memotong
+            ctx.arc(cx, cy, rInner, 0, 2 * Math.PI, true);
             ctx.fill();
             ctx.stroke();
 
-            // Lingkaran batas dalam
             ctx.beginPath();
             ctx.arc(cx, cy, rInner, 0, 2 * Math.PI, false);
             ctx.stroke();
 
             drawCentroidMarker(ctx, cx, cy);
+        }
+
+        function drawEqTriangle(a, h, xc, yc) {
+            const { canvas, ctx } = clearCanvas('sectionCanvas');
+            const scale = Math.min((canvas.width - 40) / a, (canvas.height - 40) / h);
+            const x0 = (canvas.width - a * scale) / 2;
+            const y0 = canvas.height - (canvas.height - h * scale) / 2;
+
+            ctx.fillStyle = '#93c5fd'; ctx.strokeStyle = '#1d4ed8'; ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x0 + a * scale, y0);
+            ctx.lineTo(x0 + (a / 2) * scale, y0 - h * scale);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            drawCentroidMarker(ctx, x0 + xc * scale, y0 - yc * scale);
+        }
+
+        function drawRightTriangle(b, h, xc, yc) {
+            const { canvas, ctx } = clearCanvas('sectionCanvas');
+            const scale = Math.min((canvas.width - 40) / b, (canvas.height - 40) / h);
+            const x0 = (canvas.width - b * scale) / 2;
+            const y0 = canvas.height - (canvas.height - h * scale) / 2;
+
+            ctx.fillStyle = '#93c5fd'; ctx.strokeStyle = '#1d4ed8'; ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x0 + b * scale, y0);
+            ctx.lineTo(x0, y0 - h * scale);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            drawCentroidMarker(ctx, x0 + xc * scale, y0 - yc * scale);
         }
 
         function drawIShape(bf, tf, hw, tw) {
